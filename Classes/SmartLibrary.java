@@ -1,3 +1,4 @@
+package Classes;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -7,302 +8,19 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Stack;
 
-// interface for options
-interface LibraryADT {
-
-    void addBook(int isbn, String title, String author, int copies);
-
-    void addCopiesToBook(int isbn, int copies);
-
-    void searchBookByIsbn(int isbn);
-
-    void searchBookByTitle(String title);
-
-    void searchBookByAuthor(String author);
-
-    void borrowBook(int isbn);
-
-    void returnBook(int isbn);
-
-    void viewLatestHistory();
-
-    void viewBorrowedBooks();
-
-    void deleteBook();
-
-    void printWholeCatalogue();
-}
-
-// ==========================================
-// Pure Data Models
-// ==========================================
-class Book {
-
-    private int isbn;
-    private String title;
-    private String author;
-    private int totalCopies;
-    private int availableCopies;
-
-    public Book(int isbn, String title, String author, int copies) {
-        this(isbn, title, author, copies, copies);
-    }
-
-    public Book(int isbn, String title, String author, int totalCopies, int availableCopies) {
-        this.isbn = isbn;
-        this.title = title;
-        this.author = author;
-        this.totalCopies = totalCopies;
-        this.availableCopies = availableCopies;
-    }
-
-    public int getIsbn() {
-        return isbn;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public int getTotalCopies() {
-        return totalCopies;
-    }
-
-    public int getAvailableCopies() {
-        return availableCopies;
-    }
-
-    public void borrowCopy() {
-        if (availableCopies > 0) {
-            availableCopies--;
-        }
-    }
-
-    public void returnCopy() {
-        if (availableCopies < totalCopies) {
-            availableCopies++;
-        }
-    }
-
-    public void addCopies(int newCopies) {
-        this.totalCopies += newCopies;
-        this.availableCopies += newCopies;
-    }
-
-    public void removeCopies(int count) {
-        if (count < 0 || count > this.availableCopies) {
-            throw new IllegalArgumentException("Cannot remove more copies than available.");
-        }
-        this.totalCopies -= count;
-        this.availableCopies -= count;
-    }
-
-    public String toCSV() {
-        return isbn + "," + title + "," + author + "," + totalCopies + "," + availableCopies;
-    }
-
-    @Override
-    public String toString() {
-        return "[ISBN: " + isbn + "] " + title + " by " + author
-                + " | Total: " + totalCopies + " (" + availableCopies + " Available)";
-    }
-}
-
-class HistoryRecord {
-
-    private Book book;
-    private String action;
-
-    public HistoryRecord(Book book, String action) {
-        this.book = book;
-        this.action = action;
-    }
-
-    public Book getBook() {
-        return book;
-    }
-
-    public String getAction() {
-        return action;
-    }
-
-    public String toCSV() {
-        return book.getIsbn() + "," + action;
-    }
-}
-
-// ==========================================
-// 2. Catalogue Architect: Binary Search Tree
-// ==========================================
-class BookBST {
-
-    private class Node {
-
-        Book book;
-        Node left, right;
-
-        Node(Book book) {
-            this.book = book;
-        }
-    }
-
-    private Node root;
-
-    public void insert(Book book) {
-        root = insertRec(root, book);
-    }
-
-    private Node insertRec(Node root, Book book) {
-        if (root == null) {
-            return new Node(book);
-        }
-        if (book.getIsbn() < root.book.getIsbn()) {
-            root.left = insertRec(root.left, book);
-        } else if (book.getIsbn() > root.book.getIsbn()) {
-            root.right = insertRec(root.right, book);
-        }
-        return root;
-    }
-
-    public Book search(int isbn) {
-        Node result = searchRec(root, isbn);
-        return result == null ? null : result.book;
-    }
-
-    private Node searchRec(Node root, int isbn) {
-        if (root == null || root.book.getIsbn() == isbn) {
-            return root;
-        }
-        if (root.book.getIsbn() > isbn) {
-            return searchRec(root.left, isbn);
-        }
-        return searchRec(root.right, isbn);
-    }
-
-    public void delete(int isbn) {
-        root = deleteRec(root, isbn);
-    }
-
-    private Node deleteRec(Node root, int isbn) {
-        if (root == null) {
-            return root;
-        }
-
-        if (isbn < root.book.getIsbn()) {
-            root.left = deleteRec(root.left, isbn);
-        } else if (isbn > root.book.getIsbn()) {
-            root.right = deleteRec(root.right, isbn);
-        } else {
-            if (root.left == null) {
-                return root.right;
-            } else if (root.right == null) {
-                return root.left;
-            }
-
-            root.book = minValue(root.right);
-            root.right = deleteRec(root.right, root.book.getIsbn());
-        }
-        return root;
-    }
-
-    private Book minValue(Node root) {
-        Book minv = root.book;
-        while (root.left != null) {
-            minv = root.left.book;
-            root = root.left;
-        }
-        return minv;
-    }
-
-    public List<Book> getAllBooks() {
-        List<Book> list = new ArrayList<>();
-        getAllBooksRec(root, list);
-        return list;
-    }
-
-    private void getAllBooksRec(Node root, List<Book> list) {
-        if (root != null) {
-            getAllBooksRec(root.left, list);
-            list.add(root.book);
-            getAllBooksRec(root.right, list);
-        }
-    }
-
-    public void printInOrder() {
-        if (root == null) {
-            System.out.println("The catalogue is currently empty.");
-            return;
-        }
-        System.out.println("\n--- Complete Library Catalogue ---");
-        printInOrderRec(root);
-        System.out.println("----------------------------------");
-    }
-
-    private void printInOrderRec(Node root) {
-        if (root != null) {
-            printInOrderRec(root.left);
-            System.out.println(root.book.toString());
-            printInOrderRec(root.right);
-        }
-    }
-}
-
-// ==========================================
-// 3. History: LIFO Stack with Action Tracking
-// ==========================================
-class HistoryStack {
-
-    private Stack<HistoryRecord> stack = new Stack<>();
-
-    public void push(Book b, String action) {
-        stack.push(new HistoryRecord(b, action));
-    }
-
-    public List<HistoryRecord> getAllRecords() {
-        return new ArrayList<>(stack);
-    }
-
-    public void show() {
-        if (stack.isEmpty()) {
-            System.out.println("History is empty. No recent activity.");
-        } else {
-            System.out.println("\n--- Library Transaction History (Most Recent First) ---");
-            for (int i = stack.size() - 1; i >= 0; i--) {
-                HistoryRecord record = stack.get(i);
-                Book b = record.getBook();
-                System.out.println("[" + record.getAction().toUpperCase() + "] - "
-                        + "[ISBN: " + b.getIsbn() + "] " + b.getTitle());
-            }
-            System.out.println("-------------------------------------------------------");
-        }
-    }
-}
-
-// ==========================================
-// 4. Main System Interface
-// ==========================================
-class SmartLibrary implements LibraryADT {
+public class SmartLibrary implements LibraryADT {
 
     private BookBST catalogue = new BookBST();
     private HistoryStack history = new HistoryStack();
     private Scanner sc = new Scanner(System.in);
-
     private HashMap<String, Book> titleIndex = new HashMap<>();
     private HashMap<String, List<Book>> authorIndex = new HashMap<>();
-
     private String userRole = "";
-
-    // Tracks ISBNs borrowed in this session to validate returns
     private List<Integer> sessionBorrowedIsbns = new ArrayList<>();
 
-    private final String CATALOGUE_FILE = "catalogue.csv";
-    private final String HISTORY_FILE = "history.csv";
+    private final String CATALOGUE_FILE = "Database/catalogue.csv";
+    private final String HISTORY_FILE = "Database/history.csv";
 
     public SmartLibrary() {
         loadData();
@@ -600,57 +318,58 @@ class SmartLibrary implements LibraryADT {
             boolean loggedIn = true;
             while (loggedIn) {
                 printMenu();
-                System.out.print("Choice: ");
-                String input = sc.nextLine();
-                int choice;
+                System.out.print("Enter Command: ");
+                String command = sc.nextLine().trim().toLowerCase(); // Normalize input
 
-                try {
-                    choice = Integer.parseInt(input.trim());
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Please enter a valid number.");
+                // Admin security checkpoint using semantic words
+                if (userRole.equals("Student") && (command.equals("add") || command.equals("restock") || command.equals("delete"))) {
+                    System.out.println("Permission Denied: Only Librarians can manage library inventory.");
                     continue;
                 }
 
-                if (userRole.equals("Student") && (choice >= 1 && choice <= 3)) {
-                    System.out.println("Permission Denied: Only Librarians can manage inventory.");
-                    continue;
-                }
-
-                if (choice == 10) {
+                if (command.equals("logout") || command.equals("10")) {
                     System.out.println("Logging out...");
                     loggedIn = false;
                     break;
                 }
 
-                if (choice == 11) {
+                if (command.equals("exit") || command.equals("quit") || command.equals("11")) {
                     System.out.println("Saving and shutting down. Goodbye!");
                     saveData();
                     return;
                 }
 
-                handleChoice(choice);
+                handleChoice(command);
             }
         }
     }
 
     private void printMenu() {
-        System.out.println("\n--- SmartLibrary Menu (" + userRole + ") ---");
-        System.out.println(userRole.equals("Librarian") ? "1. Add New Book" : "1. Add New Book [LOCKED]");
-        System.out.println(userRole.equals("Librarian") ? "2. Add Copies (Restock)" : "2. Add Copies (Restock) [LOCKED]");
-        System.out.println(userRole.equals("Librarian") ? "3. Delete Book" : "3. Delete Book [LOCKED]");
-        System.out.println("4. Search Book");
-        System.out.println("5. Borrow Book");
-        System.out.println("6. Return Book");
-        System.out.println("7. View History Log");
-        System.out.println("8. View Borrowed Books");
-        System.out.println("9. Print Whole Catalogue");
-        System.out.println("10. Logout (Change Role)");
-        System.out.println("11. Exit System");
+        System.out.println("\n===== SmartLibrary CLI Navigation (" + userRole + ") =====");
+        System.out.println("Type one of the following command keywords to execute an action:\n");
+
+        if (userRole.equals("Librarian")) {
+            System.out.printf("  %-12s -> %s\n", "[1] add", "Register a completely new book title");
+            System.out.printf("  %-12s -> %s\n", "[2] restock", "Add physical copies to an existing book");
+            System.out.printf("  %-12s -> %s\n", "[3] delete", "Remove copies or purge a book entirely");
+        } else {
+            System.out.println("  [Inventory Management Commands Locked for Students]");
+        }
+
+        System.out.printf("  %-12s -> %s\n", "[4] search", "Find a book via ISBN, Title, or Author");
+        System.out.printf("  %-12s -> %s\n", "[5] borrow", "Checkout a book copy");
+        System.out.printf("  %-12s -> %s\n", "[6] return", "Check-in a borrowed book copy");
+        System.out.printf("  %-12s -> %s\n", "[7] history", "View the chronological library audit log");
+        System.out.printf("  %-12s -> %s\n", "[8] borrowed", "List all books currently missing copies");
+        System.out.printf("  %-12s -> %s\n", "[9] catalog", "Print the complete library collection sorted by ISBN");
+        System.out.printf("  %-12s -> %s\n", "[10] logout", "Log out of current profile back to main login panel");
+        System.out.printf("  %-12s -> %s\n", "[11] exit", "Save database metrics and safely kill the application process");
+        System.out.println("=================================================================");
     }
 
-    private void handleChoice(int choice) {
-        switch (choice) {
-            case 1:
+    private void handleChoice(String command) {
+        switch (command) {
+            case "add", "1":
                 try {
                     System.out.print("Enter ISBN (Numbers only): ");
                     int isbn = Integer.parseInt(sc.nextLine().trim());
@@ -678,11 +397,11 @@ class SmartLibrary implements LibraryADT {
                     }
                     addBook(isbn, title, author, copies);
                 } catch (NumberFormatException e) {
-                    System.out.println("Error: ISBN and number of copies must be valid integers.");
+                    System.out.println("Error: Numeric inputs must be valid integers.");
                 }
                 break;
 
-            case 2:
+            case "restock", "2":
                 try {
                     System.out.print("Enter ISBN to restock: ");
                     int isbn = Integer.parseInt(sc.nextLine().trim());
@@ -698,16 +417,16 @@ class SmartLibrary implements LibraryADT {
                     }
                     addCopiesToBook(isbn, copies);
                 } catch (NumberFormatException e) {
-                    System.out.println("Error: ISBN and number of copies must be valid integers.");
+                    System.out.println("Error: Numeric inputs must be valid integers.");
                 }
                 break;
 
-            case 3:
+            case "delete", "3":
                 deleteBook();
                 break;
 
-            case 4:
-                System.out.println("Search by: [1] ISBN [2] Title [3] Author");
+            case "search", "4":
+                System.out.println("Search options: [1] ISBN [2] Title [3] Author");
                 System.out.print("Choice: ");
                 String searchType = sc.nextLine().trim();
 
@@ -716,7 +435,7 @@ class SmartLibrary implements LibraryADT {
                         System.out.print("Enter ISBN: ");
                         searchBookByIsbn(Integer.parseInt(sc.nextLine().trim()));
                     } catch (NumberFormatException e) {
-                        System.out.println("Error: ISBN must be a number.");
+                        System.out.println("Error: ISBN must be a valid integer.");
                     }
                 } else if (searchType.equals("2")) {
                     System.out.print("Enter Title: ");
@@ -735,11 +454,11 @@ class SmartLibrary implements LibraryADT {
                         searchBookByAuthor(authorQuery);
                     }
                 } else {
-                    System.out.println("Invalid search type.");
+                    System.out.println("Invalid search options context.");
                 }
                 break;
 
-            case 5:
+            case "borrow", "5":
                 try {
                     System.out.print("Enter ISBN to borrow: ");
                     borrowBook(Integer.parseInt(sc.nextLine().trim()));
@@ -748,7 +467,7 @@ class SmartLibrary implements LibraryADT {
                 }
                 break;
 
-            case 6:
+            case "return", "6":
                 try {
                     System.out.print("Enter ISBN to return: ");
                     returnBook(Integer.parseInt(sc.nextLine().trim()));
@@ -757,30 +476,20 @@ class SmartLibrary implements LibraryADT {
                 }
                 break;
 
-            case 7:
+            case "history", "7":
                 viewLatestHistory();
                 break;
 
-            case 8:
+            case "borrowed", "8":
                 viewBorrowedBooks();
                 break;
 
-            case 9:
+            case "catalog", "9":
                 printWholeCatalogue();
                 break;
 
             default:
-                System.out.println("Invalid option. Please choose a valid menu number.");
+                System.out.println("Unknown command flag. Look at the guidelines chart above for reference.");
         }
-    }
-}
-
-// ==========================================
-// Application Entry Point
-// ==========================================
-public class Main {
-
-    public static void main(String[] args) {
-        new SmartLibrary().runMenu();
     }
 }
