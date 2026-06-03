@@ -59,9 +59,9 @@ public class SmartLibrary implements LibraryADT {
                 }
                 reader.close();
             }
-            System.out.println("System Initialized: Data loaded successfully.");
+            System.out.println("System Initialised: Data loaded successfully.");
         } catch (FileNotFoundException e) {
-            System.out.println("System Initialized: No previous save data found. Starting fresh.");
+            System.out.println("System Initialised: No previous save data found. Starting fresh.");
         } catch (Exception e) {
             System.out.println("Warning: Could not perfectly load all save data.");
         }
@@ -265,7 +265,7 @@ public class SmartLibrary implements LibraryADT {
 
     @Override
     public void viewBorrowedBooks() {
-        System.out.println("\n--- Currently Borrowed Books ---");
+        System.out.println("\n<<--- Currently Borrowed Books --->>");
         List<Book> allBooks = catalogue.getAllBooks();
         boolean found = false;
 
@@ -281,7 +281,7 @@ public class SmartLibrary implements LibraryADT {
         if (!found) {
             System.out.println("All books are currently in the library.");
         }
-        System.out.println("--------------------------------");
+        System.out.println("<<-------------------------------->>");
     }
 
     @Override
@@ -345,7 +345,7 @@ public class SmartLibrary implements LibraryADT {
     }
 
     private void printMenu() {
-        System.out.println("\n===== SmartLibrary CLI Navigation (" + userRole + ") =====");
+        System.out.println("\n<<----- SmartLibrary CLI Navigation (" + userRole + ") ----->>");
         System.out.println("Type one of the following command keywords to execute an action:\n");
 
         if (userRole.equals("Librarian")) {
@@ -364,7 +364,7 @@ public class SmartLibrary implements LibraryADT {
         System.out.printf("  %-12s -> %s\n", "[9] catalog", "Print the complete library collection sorted by ISBN");
         System.out.printf("  %-12s -> %s\n", "[10] logout", "Log out of current profile back to main login panel");
         System.out.printf("  %-12s -> %s\n", "[11] exit", "Save database metrics and safely kill the application process");
-        System.out.println("=================================================================");
+        System.out.println("<<----------------------------------------------------------------->>");
     }
 
     private void handleChoice(String command) {

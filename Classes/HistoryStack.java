@@ -18,16 +18,16 @@ public class HistoryStack {
 
     public void show() {
         if (stack.isEmpty()) {
-            System.out.println("History is empty. No recent activity.");
+            System.out.println("No recent borrowing or return activity.v");
         } else {
-            System.out.println("\n--- Library Transaction History (Most Recent First) ---");
+            System.out.println("\n<<-- Recent Library Transaction Records -->>");
             for (int i = stack.size() - 1; i >= 0; i--) {
                 HistoryRecord record = stack.get(i);
                 Book b = record.getBook();
                 System.out.println("[" + record.getAction().toUpperCase() + "] - "
                         + "[ISBN: " + b.getIsbn() + "] " + b.getTitle());
             }
-            System.out.println("-------------------------------------------------------");
+            System.out.println("<<----------------------------------------------------->>");
         }
     }
 }
