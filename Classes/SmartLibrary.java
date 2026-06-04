@@ -28,14 +28,32 @@ public class SmartLibrary implements LibraryADT {
 
     private void loadData() {
         try {
+            File databaseDir = new File("Database");
+            if (!databaseDir.exists()) {
+                databaseDir.mkdirs();
+            }
+
             File catFile = new File(CATALOGUE_FILE);
             if (catFile.exists()) {
                 Scanner reader = new Scanner(catFile);
                 while (reader.hasNextLine()) {
-                    String[] data = reader.nextLine().split(",");
-                    if (data.length == 5) {
-                        Book b = new Book(Integer.parseInt(data[0]), data[1], data[2],
-                                Integer.parseInt(data[3]), Integer.parseInt(data[4]));
+                    String line = reader.nextLine().trim();
+                    if (line.isEmpty()) continue;
+                    String[] data = line.split(",");
+                   if (data.length == 5) {
+                       int isbn = Integer.parseInt(data[0].trim());
+                       String title = data[1].trim();
+                       String author = data[2].trim();
+                       int totalCopies = Integer.parseInt(data[3].trim());
+                       int availableCopies = Integer.parseInt(data[4].trim());
+
+                        Book b = new Book(isbn, title, author, totalCopies);
+                        
+                        int missingCopies = totalCopies - availableCopies;
+                        for (int i = 0; i < missingCopies; i++) {
+                            b.borrowCopy(); 
+                        }
+
                         catalogue.insert(b);
                         titleIndex.put(b.getTitle().toLowerCase(), b);
                         authorIndex.putIfAbsent(b.getAuthor().toLowerCase(), new ArrayList<>());
@@ -49,11 +67,16 @@ public class SmartLibrary implements LibraryADT {
             if (histFile.exists()) {
                 Scanner reader = new Scanner(histFile);
                 while (reader.hasNextLine()) {
-                    String[] data = reader.nextLine().split(",");
+                    String line = reader.nextLine().trim();
+                    if (line.isEmpty()) continue;
+                    String[] data = line.split(",");
                     if (data.length == 2) {
-                        Book b = catalogue.search(Integer.parseInt(data[0]));
+                    int isbn = Integer.parseInt(data[0].trim());
+                    String status = data[1].trim();
+
+                        Book b = catalogue.search(isbn);
                         if (b != null) {
-                            history.push(b, data[1]);
+                            history.push(b, status);
                         }
                     }
                 }
@@ -69,6 +92,11 @@ public class SmartLibrary implements LibraryADT {
 
     private void saveData() {
         try {
+            File databaseDir = new File("Database");
+            if (!databaseDir.exists()) {
+                databaseDir.mkdirs();
+            }
+
             PrintWriter catWriter = new PrintWriter(CATALOGUE_FILE);
             for (Book b : catalogue.getAllBooks()) {
                 catWriter.println(b.toCSV());
@@ -135,12 +163,11 @@ public class SmartLibrary implements LibraryADT {
             System.out.println(" - Enter a [number] to delete that many available copies.");
             System.out.println(" - Type 'all' to delete ALL available copies.");
             System.out.println(" - Type 'purge' to completely remove the book from the system.");
-            System.out.println(" - Type 'exit' to cancel and return to the menu."); // <-- NEW OPTION
+            System.out.println(" - Type 'exit' to cancel and return to the menu.");
             System.out.print("Choice: ");
 
             String choice = sc.nextLine().trim().toLowerCase();
 
-            // Check for exit first
             if (choice.equals("exit") || choice.equals("cancel")) {
                 System.out.println("Deletion cancelled. Returning to menu.");
                 return;
@@ -150,8 +177,12 @@ public class SmartLibrary implements LibraryADT {
                 } else {
                     catalogue.delete(isbn);
                     titleIndex.remove(b.getTitle().toLowerCase());
-                    if (authorIndex.containsKey(b.getAuthor().toLowerCase())) {
-                        authorIndex.get(b.getAuthor().toLowerCase()).remove(b);
+                    String authorKey = b.getAuthor().toLowerCase();
+                    if (authorIndex.containsKey(authorKey)) {
+                        authorIndex.get(authorKey).remove(b);
+                        if (authorIndex.get(authorKey).isEmpty()) {
+                            authorIndex.remove(authorKey);
+                        }
                     }
                     System.out.println("Success: All records of '" + b.getTitle() + "' have been deleted.");
                 }
@@ -164,18 +195,23 @@ public class SmartLibrary implements LibraryADT {
                     System.out.println("Success: Removed " + removed + " copies. " + b.getTotalCopies() + " total copies remain.");
                 }
             } else {
-                int amount = Integer.parseInt(choice);
-                if (amount <= 0) {
-                    System.out.println("Error: Amount must be greater than 0.");
-                } else if (amount > b.getAvailableCopies()) {
-                    System.out.println("Error: Cannot delete " + amount + " copies. Only " + b.getAvailableCopies() + " are available.");
+                // Bug #1 Fix: Explicitly validate digits instead of relying on the catch block
+                if (choice.matches("\\d+")) {
+                    int amount = Integer.parseInt(choice);
+                    if (amount <= 0) {
+                        System.out.println("Error: Amount must be greater than 0.");
+                    } else if (amount > b.getAvailableCopies()) {
+                        System.out.println("Error: Cannot delete " + amount + " copies. Only " + b.getAvailableCopies() + " are available.");
+                    } else {
+                        b.removeCopies(amount);
+                        System.out.println("Success: Removed " + amount + " copies. " + b.getAvailableCopies() + " available copies remain.");
+                    }
                 } else {
-                    b.removeCopies(amount);
-                    System.out.println("Success: Removed " + amount + " copies. " + b.getAvailableCopies() + " available copies remain.");
+                    System.out.println("Error: Invalid option selection. Expected a number, 'all', 'purge', or 'exit'.");
                 }
             }
         } catch (NumberFormatException e) {
-            System.out.println("Error: Invalid input. Expected a number, 'all', 'purge', or 'exit'.");
+            System.out.println("Error: Invalid input. Expected a valid integer for ISBN.");
         }
     }
 
@@ -189,16 +225,25 @@ public class SmartLibrary implements LibraryADT {
         }
     }
 
+   
     @Override
     public void searchBookByTitle(String title) {
-        Book b = titleIndex.get(title.toLowerCase());
-        if (b != null) {
-            System.out.println("Found: " + b.toString());
-        } else {
-            System.out.println("Result: No book found with title '" + title + "'.");
+        String lowerQuery = title.toLowerCase();
+        boolean found = false;
+
+        // Iterate through the index keys to catch partial title matches
+        for (String storedTitle : titleIndex.keySet()) {
+            if (storedTitle.contains(lowerQuery)) {
+                System.out.println("Found: " + titleIndex.get(storedTitle).toString());
+                found = true;
+            }
+        }
+
+        if (!found) {
+            System.out.println("Result: No book found containing the title '" + title + "'.");
         }
     }
-
+        
     @Override
     public void searchBookByAuthor(String author) {
         List<Book> books = authorIndex.get(author.toLowerCase());
@@ -289,21 +334,27 @@ public class SmartLibrary implements LibraryADT {
         catalogue.printInOrder();
     }
 
+    @Override
     public void runMenu() {
         System.out.println("\nWelcome to the Smart Library System");
 
         while (true) {
             System.out.println("\n--- Login ---");
-            System.out.println("Are you logging in as a [1] Student, [2] Librarian, or [3] Shut Down?");
+            System.out.println("Are you logging in as a Student, Librarian, or Shut Down?");
+            System.out.println("  1. Student");
+            System.out.println("  2. Librarian");
+            System.out.println("  3. Shut Down");
 
             while (true) {
                 System.out.print("Choice: ");
                 String roleChoice = sc.nextLine().trim();
                 if (roleChoice.equals("1")) {
                     userRole = "Student";
+                    sessionBorrowedIsbns.clear(); // Clear session state upon new login context
                     break;
                 } else if (roleChoice.equals("2")) {
                     userRole = "Librarian";
+                    sessionBorrowedIsbns.clear(); // Clear session state upon new login context
                     break;
                 } else if (roleChoice.equals("3")) {
                     System.out.println("Saving and shutting down. Goodbye!");
@@ -319,16 +370,11 @@ public class SmartLibrary implements LibraryADT {
             while (loggedIn) {
                 printMenu();
                 System.out.print("Enter Command: ");
-                String command = sc.nextLine().trim().toLowerCase(); // Normalize input
-
-                // Admin security checkpoint using semantic words
-                if (userRole.equals("Student") && (command.equals("add") || command.equals("restock") || command.equals("delete"))) {
-                    System.out.println("Permission Denied: Only Librarians can manage library inventory.");
-                    continue;
-                }
+                String command = sc.nextLine().trim().toLowerCase();
 
                 if (command.equals("logout") || command.equals("10")) {
                     System.out.println("Logging out...");
+                    sessionBorrowedIsbns.clear(); // Safely clear tracking state on explicit logout
                     loggedIn = false;
                     break;
                 }
@@ -349,27 +395,31 @@ public class SmartLibrary implements LibraryADT {
         System.out.println("Type one of the following command keywords to execute an action:\n");
 
         if (userRole.equals("Librarian")) {
-            System.out.printf("  %-12s -> %s\n", "[1] add", "Register a completely new book title");
-            System.out.printf("  %-12s -> %s\n", "[2] restock", "Add physical copies to an existing book");
-            System.out.printf("  %-12s -> %s\n", "[3] delete", "Remove copies or purge a book entirely");
+            System.out.printf("  %-12s -> %s\n", " add", "Register a completely new book title");
+            System.out.printf("  %-12s -> %s\n", " restock", "Add physical copies to an existing book");
+            System.out.printf("  %-12s -> %s\n", " delete", "Remove copies or purge a book entirely");
         } else {
             System.out.println("  [Inventory Management Commands Locked for Students]");
         }
 
-        System.out.printf("  %-12s -> %s\n", "[4] search", "Find a book via ISBN, Title, or Author");
-        System.out.printf("  %-12s -> %s\n", "[5] borrow", "Checkout a book copy");
-        System.out.printf("  %-12s -> %s\n", "[6] return", "Check-in a borrowed book copy");
-        System.out.printf("  %-12s -> %s\n", "[7] history", "View the chronological library audit log");
-        System.out.printf("  %-12s -> %s\n", "[8] borrowed", "List all books currently missing copies");
-        System.out.printf("  %-12s -> %s\n", "[9] catalog", "Print the complete library collection sorted by ISBN");
-        System.out.printf("  %-12s -> %s\n", "[10] logout", "Log out of current profile back to main login panel");
-        System.out.printf("  %-12s -> %s\n", "[11] exit", "Save database metrics and safely kill the application process");
+        System.out.printf("  %-12s -> %s\n", " search", "Find a book via ISBN, Title, or Author");
+        System.out.printf("  %-12s -> %s\n", " borrow", "Checkout a book copy");
+        System.out.printf("  %-12s -> %s\n", " return", "Check-in a borrowed book copy");
+        System.out.printf("  %-12s -> %s\n", " history", "View the chronological library audit log");
+        System.out.printf("  %-12s -> %s\n", " borrowed", "List all books currently missing copies");
+        System.out.printf("  %-12s -> %s\n", " catalog", "Print the complete library collection sorted by ISBN");
+        System.out.printf("  %-12s -> %s\n", " logout", "Log out of current profile back to main login panel");
+        System.out.printf("  %-12s -> %s\n", " exit", "Save database metrics and safely kill the application process");
         System.out.println("<<----------------------------------------------------------------->>");
     }
 
     private void handleChoice(String command) {
         switch (command) {
             case "add", "1":
+                if (!userRole.equals("Librarian")) {
+                    System.out.println("Permission Denied: Only Librarians can manage library inventory.");
+                    break;
+                }
                 try {
                     System.out.print("Enter ISBN (Numbers only): ");
                     int isbn = Integer.parseInt(sc.nextLine().trim());
@@ -402,6 +452,10 @@ public class SmartLibrary implements LibraryADT {
                 break;
 
             case "restock", "2":
+                if (!userRole.equals("Librarian")) {
+                    System.out.println("Permission Denied: Only Librarians can manage library inventory.");
+                    break;
+                }
                 try {
                     System.out.print("Enter ISBN to restock: ");
                     int isbn = Integer.parseInt(sc.nextLine().trim());
@@ -422,22 +476,26 @@ public class SmartLibrary implements LibraryADT {
                 break;
 
             case "delete", "3":
+                if (!userRole.equals("Librarian")) {
+                    System.out.println("Permission Denied: Only Librarians can manage library inventory.");
+                    break;
+                }
                 deleteBook();
                 break;
 
             case "search", "4":
-                System.out.println("Search options: [1] ISBN [2] Title [3] Author");
+                System.out.println("Search options: 1. ISBN | 2. Title | 3. Author");
                 System.out.print("Choice: ");
                 String searchType = sc.nextLine().trim();
 
-                if (searchType.equals("1")) {
+                if (searchType.equals("1") || searchType.equalsIgnoreCase("isbn")) {
                     try {
                         System.out.print("Enter ISBN: ");
                         searchBookByIsbn(Integer.parseInt(sc.nextLine().trim()));
                     } catch (NumberFormatException e) {
                         System.out.println("Error: ISBN must be a valid integer.");
                     }
-                } else if (searchType.equals("2")) {
+                } else if (searchType.equals("2") || searchType.equalsIgnoreCase("title")) {
                     System.out.print("Enter Title: ");
                     String titleQuery = sc.nextLine().trim();
                     if (titleQuery.isEmpty()) {
@@ -445,7 +503,7 @@ public class SmartLibrary implements LibraryADT {
                     } else {
                         searchBookByTitle(titleQuery);
                     }
-                } else if (searchType.equals("3")) {
+                } else if (searchType.equals("3") || searchType.equalsIgnoreCase("author")) {
                     System.out.print("Enter Author: ");
                     String authorQuery = sc.nextLine().trim();
                     if (authorQuery.isEmpty()) {

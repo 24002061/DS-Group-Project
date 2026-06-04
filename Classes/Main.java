@@ -1,8 +1,8 @@
 package Classes;
 
 public class Main {
-
     public static void main(String[] args) {
-        new SmartLibrary().runMenu();
+        SmartLibrary library = new SmartLibrary(); // Simplified instantiation
+        library.runMenu();
     }
 }

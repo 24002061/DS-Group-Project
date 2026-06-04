@@ -18,11 +18,17 @@ public class HistoryStack {
 
     public void show() {
         if (stack.isEmpty()) {
-            System.out.println("No recent borrowing or return activity.v");
+            System.out.println("No recent borrowing or return activity.");
         } else {
             System.out.println("\n<<-- Recent Library Transaction Records -->>");
-            for (int i = stack.size() - 1; i >= 0; i--) {
-                HistoryRecord record = stack.get(i);
+            
+            // 1. Create a temporary stack and copy all elements into it
+            Stack<HistoryRecord> tempStack = new Stack<>();
+            tempStack.addAll(stack);
+            
+            // 2. Pop elements one by one from the temp stack (this automatically gives LIFO order)
+            while (!tempStack.isEmpty()) {
+                HistoryRecord record = tempStack.pop(); // Pure Stack operation!
                 Book b = record.getBook();
                 System.out.println("[" + record.getAction().toUpperCase() + "] - "
                         + "[ISBN: " + b.getIsbn() + "] " + b.getTitle());
